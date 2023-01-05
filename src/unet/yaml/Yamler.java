@@ -100,6 +100,11 @@ public class Yamler {
     }
 
     private YamlBytes getKey(){
+        boolean q = false;
+        if(buf[pos] == 0x27 || buf[pos] == '"'){
+            q = true;
+        }
+
         int s = pos;
 
         while(pos < buf.length){
@@ -107,6 +112,14 @@ public class Yamler {
                 break;
             }
             pos++;
+        }
+
+        if(q){
+            byte[] b = new byte[pos-s-2];
+            System.arraycopy(buf, s+1, b, 0, pos-s-2);
+            pos++;
+
+            return new YamlBytes(b);
         }
 
         byte[] b = new byte[pos-s];
@@ -138,7 +151,6 @@ public class Yamler {
 
         if(buf[pos] == 0x27){
             return getQuote(0x27);
-
         }
 
         if(buf[pos] == '"'){
