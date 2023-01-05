@@ -1,5 +1,6 @@
 package unet.yaml.variables;
 
+import unet.yaml.YamlException;
 import unet.yaml.Yamler;
 
 import java.nio.charset.Charset;
@@ -32,14 +33,6 @@ public class YamlArray implements YamlVariable {
                 add((Map<?, ?>) v);
             }
         }
-    }
-
-    public YamlArray(byte[] buf){
-        this(new Yamler().decodeArray(buf, 0));
-    }
-
-    public YamlArray(byte[] buf, int off){
-        this(new Yamler().decodeArray(buf, off));
     }
 
     private void add(YamlVariable v){

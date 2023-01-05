@@ -13,17 +13,15 @@ public class Yamler {
     private int pos = 0;
 
     public byte[] encode(YamlArray l){
-        return null;
+        //buf = new byte[l.byteSize()];
+        put(l);
+        return buf;
     }
 
     public byte[] encode(YamlObject m){
-        return null;
-    }
-
-    public List<YamlVariable> decodeArray(byte[] buf, int off){
-        this.buf = buf;
-        pos = off;
-        return decodeArray();
+        //buf = new byte[m.byteSize()];
+        put(m);
+        return buf;
     }
 
     public Map<YamlBytes, YamlVariable> decodeObject(byte[] buf, int off)throws YamlException {
@@ -45,54 +43,32 @@ public class Yamler {
     }
 
     private void put(YamlBytes v){
-        byte[] b = v.getBytes();
-        System.arraycopy(b, 0, buf, pos, b.length);
-        pos += b.length;
     }
 
     private void put(YamlNumber n){
-        byte[] b = n.getBytes();
-        System.arraycopy(b, 0, buf, pos, b.length);
-        pos += b.length;
     }
 
     private void put(YamlArray l){
-        buf[pos] = 'l';
-        pos++;
-
-        for(int i = 0; i < l.size(); i++){
-            put(l.valueOf(i));
-        }
-        buf[pos] = 'e';
-        pos++;
     }
 
     private void put(YamlObject m){
-        buf[pos] = 'd';
-        pos++;
-
-        for(YamlBytes k : m.keySet()){
-            put(k);
-            put(m.valueOf(k));
-        }
-        buf[pos] = 'e';
-        pos++;
     }
 
-    private List<YamlVariable> decodeArray(){
-        /*
-        if(buf[pos] == 'l'){
-            ArrayList<YamlVariable> a = new ArrayList<>();
-            pos++;
+    private List<YamlVariable> decodeArray()throws YamlException {
+        ArrayList<YamlVariable> a = new ArrayList<>();
 
-            while(buf[pos] != 'e'){
-                a.add(get());
+        while(pos < buf.length){
+            getDepth();
+            if(isList()){
+                pos++;
+                a.add(getVariable());
+            }else{
+                break;
             }
             pos++;
-            return a;
         }
-        */
-        return null;
+
+        return a;
     }
 
     public Map<YamlBytes, YamlVariable> decodeObject()throws YamlException {
@@ -102,21 +78,22 @@ public class Yamler {
         return decodeObject(depth);
     }
 
-    public Map<YamlBytes, YamlVariable> decodeObject(int d)throws YamlException {
+    private Map<YamlBytes, YamlVariable> decodeObject(int d)throws YamlException {
         HashMap<YamlBytes, YamlVariable> m = new HashMap<>();
-        while(pos < buf.length){
-            if(!isNewLine()){
-                if(d != getDepth()){
-                    throw new YamlException("Depth is incorrect... "+d);
-                }
-                //System.out.println((char)buf[pos]);
-                //System.out.println(new String(buf, pos-5, pos));
-                if(isNewLine()){
-                    continue;
-                }
-
-                m.put(getKey(), getVariable(d));
+        while(pos < buf.length && !isNewLine()){
+            if(d != getDepth()){
+                throw new YamlException("Depth is incorrect... "+d);
             }
+
+            if(isNewLine()){
+                continue;
+            }
+
+            if(isFooter()){
+                break;
+            }
+
+            m.put(getKey(), getVariable());
             pos++;
         }
         return m;
@@ -139,23 +116,40 @@ public class Yamler {
         return new YamlBytes(b);
     }
 
-    private YamlVariable getVariable(int d)throws YamlException {
+    private YamlVariable getVariable()throws YamlException {
         while(pos < buf.length && isSpace()){
             pos++;
         }
 
         if(isNewLine()){
             pos++;
-            return getList(d);
+            return getList();
         }
 
         if(isMultiLine()){
             pos++;
-            return getMultiLine(d);
+            return getMultiLine(false);
+        }
+
+        if(isMultiLinePreserve()){
+            pos++;
+            return getMultiLine(true);
+        }
+
+        if(buf[pos] == 0x27){
+            return getQuote(0x27);
+
+        }
+
+        if(buf[pos] == '"'){
+            return getQuote('"');
         }
 
         int s = pos;
         while(pos < buf.length && !isNewLine()){
+            if(isSpace() && buf[pos+1] == '#'){
+                break;
+            }
             pos++;
         }
 
@@ -165,32 +159,44 @@ public class Yamler {
         return new YamlBytes(b);
     }
 
-    private YamlVariable getList(int d){
-        System.out.println("IS LIST OR MAP???");
+    private YamlVariable getList()throws YamlException {
         while(isNewLine()){
             pos++;
         }
 
-        int de = getDepth();
+        int d = getDepth();
 
-        if(de > d){
-
+        if(isList()){
+            return new YamlArray(decodeArray());
+        }else if(isKey()){
+            pos -= d;
+            return new YamlObject(decodeObject(d));
         }
 
-        return new YamlBytes("asd".getBytes());
+        return new YamlBytes(new byte[0]);
     }
 
-    private YamlBytes getMultiLine(int d)throws YamlException {
+    private YamlBytes getQuote(int q){
+        pos++;
+        int s = pos;
+        while(pos < buf.length && buf[pos] != q){
+            pos++;
+        }
+
+        byte[] b = new byte[pos-s];
+        System.arraycopy(buf, s, b, 0, pos-s);
+        pos++;
+
+        return new YamlBytes(b);
+    }
+
+    private YamlBytes getMultiLine(boolean p){
         while(isNewLine()){
             pos++;
         }
 
         byte[] b = null;
-        int de = getDepthMultiLine();
-
-        if(de <= d){
-            throw new YamlException("Depth error with multiline string.");
-        }
+        getDepthMultiLine();
 
         while(pos < buf.length){
             int s = pos;
@@ -206,15 +212,23 @@ public class Yamler {
                 byte[] c = new byte[b.length];
                 System.arraycopy(b, 0, c, 0, b.length);
 
-                b = new byte[c.length+(pos-s)+2];
-                b[c.length] = '\r';
-                b[c.length+1] = '\n';
-                System.arraycopy(c, 0, b, 0, c.length);
-                System.arraycopy(buf, s, b, c.length+2, pos-s);
+                if(p){
+                    b = new byte[c.length+(pos-s)+2];
+                    b[c.length] = '\r';
+                    b[c.length+1] = '\n';
+                    System.arraycopy(c, 0, b, 0, c.length);
+                    System.arraycopy(buf, s, b, c.length+2, pos-s);
+                }else{
+                    b = new byte[c.length+(pos-s)];
+                    System.arraycopy(c, 0, b, 0, c.length);
+                    System.arraycopy(buf, s, b, c.length, pos-s);
+                }
             }
             pos++;
 
-            if(de != getDepthMultiLine()){
+            getDepthMultiLine();
+
+            if(isKey()){
                 break;
             }
         }
@@ -225,6 +239,15 @@ public class Yamler {
 
     private void ignoreHeader(){
         if(buf[pos] == '-'){
+            while(pos < buf.length && buf[pos] != '\n'){
+                pos++;
+            }
+            pos++;
+        }
+    }
+
+    private void ignoreFooter(){
+        if(buf[pos] == '.'){
             while(pos < buf.length && buf[pos] != '\n'){
                 pos++;
             }
@@ -277,11 +300,34 @@ public class Yamler {
         return (buf[pos] == '\r' || buf[pos] == '\n');
     }
 
-    public boolean isComment(){
+    private boolean isComment(){
         return buf[pos] == '#';
     }
 
-    public boolean isMultiLine(){
+    private boolean isFooter(){
+        return buf[pos] == '.';
+    }
+
+    private boolean isMultiLine(){
+        return buf[pos] == '>';
+    }
+
+    private boolean isMultiLinePreserve(){
         return buf[pos] == '|';
+    }
+
+    private boolean isList(){
+        return buf[pos] == '-';
+    }
+
+    private boolean isKey(){
+        int s = pos;
+        while(s < buf.length && !(buf[s] == '\r' || buf[s] == '\n')){
+            if(buf[s] == ':'){
+                return true;
+            }
+            s++;
+        }
+        return false;
     }
 }
