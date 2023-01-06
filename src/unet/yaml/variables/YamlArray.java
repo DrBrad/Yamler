@@ -252,8 +252,4 @@ public class YamlArray implements YamlVariable {
 
         return b+"]";
     }
-
-    public byte[] encode(){
-        return new Yamler().encode(this);
-    }
 }

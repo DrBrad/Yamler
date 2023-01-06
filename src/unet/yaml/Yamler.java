@@ -12,12 +12,6 @@ public class Yamler {
     private byte[] buf;
     private int pos = 0;
 
-    public byte[] encode(YamlArray l){
-        //buf = new byte[l.byteSize()];
-        put(l);
-        return buf;
-    }
-
     public byte[] encode(YamlObject m){
         //buf = new byte[m.byteSize()];
         put(m);
@@ -59,7 +53,7 @@ public class Yamler {
 
         while(pos < buf.length){
             getDepth();
-            if(isList()){
+            if(isArray()){
                 pos++;
                 a.add(getVariable());
             }else{
@@ -100,10 +94,16 @@ public class Yamler {
     }
 
     private YamlBytes getKey(){
-        boolean q = false;
-        if(buf[pos] == 0x27 || buf[pos] == '"'){
-            q = true;
+        /*
+        int q = 0;
+        if(buf[pos] == 0x27){
+            q = 1;
         }
+
+        if(buf[pos] == '"'){
+            q = 2;
+        }
+        */
 
         int s = pos;
 
@@ -114,13 +114,23 @@ public class Yamler {
             pos++;
         }
 
-        if(q){
+        if((buf[s] == 0x27 && buf[pos-1] == 0x27) || (buf[s] == '"' && buf[pos-1] == '"')){
             byte[] b = new byte[pos-s-2];
             System.arraycopy(buf, s+1, b, 0, pos-s-2);
             pos++;
 
             return new YamlBytes(b);
         }
+
+        /*
+        if((q == 1 && buf[pos-1] == 0x27) || (q == 2 && buf[pos-1] == '"')){
+            byte[] b = new byte[pos-s-2];
+            System.arraycopy(buf, s+1, b, 0, pos-s-2);
+            pos++;
+
+            return new YamlBytes(b);
+        }
+        */
 
         byte[] b = new byte[pos-s];
         System.arraycopy(buf, s, b, 0, pos-s);
@@ -135,6 +145,11 @@ public class Yamler {
         }
 
         if(isNewLine()){
+            pos++;
+            return getArray();
+        }
+
+        if(isList()){
             pos++;
             return getList();
         }
@@ -171,14 +186,14 @@ public class Yamler {
         return new YamlBytes(b);
     }
 
-    private YamlVariable getList()throws YamlException {
+    private YamlVariable getArray()throws YamlException {
         while(isNewLine()){
             pos++;
         }
 
         int d = getDepth();
 
-        if(isList()){
+        if(isArray()){
             return new YamlArray(decodeArray());
         }else if(isKey()){
             pos -= d;
@@ -186,6 +201,64 @@ public class Yamler {
         }
 
         return new YamlBytes(new byte[0]);
+    }
+
+    private YamlVariable getList(){
+        while(pos < buf.length && buf[pos] != ']'){
+            while(pos < buf.length && isSpace()){
+                pos++;
+            }
+
+            if(buf[pos] == 0x27){
+                //NL IS POSSIBLE...
+                int s = pos;
+                while(pos < buf.length && buf[pos] != 0x27){
+                    if(buf[pos] == ']'){
+                        pos--;
+                        break;
+                    }
+                    pos++;
+                }
+                //System.out.println(new String(buf, s, pos-s));
+                pos++;
+                continue;
+            }
+
+            int s = pos;
+            while(pos < buf.length && buf[pos] != ','){
+                if(buf[pos] == ']'){
+                    pos--;
+                    break;
+                }
+                pos++;
+            }
+
+            //System.out.println("Q  "+q);
+
+            //if((q == 1 && buf[pos-1] == 0x27) || (q == 2 && buf[pos-1] == '"')){
+            //    System.out.println(new String(buf, s+1, pos-s-2));
+
+            //}else{
+                //System.out.println(new String(buf, s, pos-s));
+            //}
+
+
+            /*
+            while(pos < buf.length && isSpace()){
+                pos++;
+            }*/
+            pos++;
+        }
+        pos++;
+
+        while(pos < buf.length && !isNewLine()){
+            if(isSpace() && buf[pos+1] == '#'){
+                break;
+            }
+            pos++;
+        }
+
+        return new YamlBytes("".getBytes());
     }
 
     private YamlBytes getQuote(int q){
@@ -258,15 +331,6 @@ public class Yamler {
         }
     }
 
-    private void ignoreFooter(){
-        if(buf[pos] == '.'){
-            while(pos < buf.length && buf[pos] != '\n'){
-                pos++;
-            }
-            pos++;
-        }
-    }
-
     private void ignoreComment(){
         while(pos < buf.length && !isNewLine()){
             pos++;
@@ -328,8 +392,12 @@ public class Yamler {
         return buf[pos] == '|';
     }
 
-    private boolean isList(){
+    private boolean isArray(){
         return buf[pos] == '-';
+    }
+
+    private boolean isList(){
+        return buf[pos] == '[';
     }
 
     private boolean isKey(){
