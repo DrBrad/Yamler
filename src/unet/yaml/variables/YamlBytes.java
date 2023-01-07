@@ -7,6 +7,16 @@ public class YamlBytes implements YamlVariable {
     private byte[] b;
 
     public YamlBytes(byte[] b){
+        for(int i = 0; i < b.length; i++){
+            if(b[i] == '\r' || b[i] == '\n'){
+                this.b = new byte[b.length+2];
+                System.arraycopy(b, 0, this.b, 1, b.length);
+                this.b[0] = '"';
+                this.b[this.b.length-1] = '"';
+                return;
+            }
+        }
+
         this.b = b;
     }
 
@@ -23,6 +33,11 @@ public class YamlBytes implements YamlVariable {
     @Override
     public byte[] getObject(){
         return b;
+    }
+
+    @Override
+    public int byteSize(){
+        return b.length;
     }
 
     @Override

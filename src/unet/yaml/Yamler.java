@@ -13,8 +13,30 @@ public class Yamler {
     private int pos = 0;
 
     public byte[] encode(YamlObject m){
-        //buf = new byte[m.byteSize()];
-        put(m);
+        return encode(m, false);
+    }
+
+    public byte[] encode(YamlObject m, boolean headers){
+        if(headers){
+            buf = new byte[m.byteSize()+8];
+            buf[0] = '-';
+            buf[1] = '-';
+            buf[2] = '-';
+            buf[3] = '\r';
+            buf[4] = '\n';
+            pos += 5;
+
+            put(m);
+
+            buf[pos] = '.';
+            buf[pos+1] = '.';
+            buf[pos+2] = '.';
+
+        }else{
+            buf = new byte[m.byteSize()];
+            put(m);
+        }
+
         return buf;
     }
 
@@ -23,29 +45,85 @@ public class Yamler {
         pos = off;
         return decodeObject();
     }
-    
-    private void put(YamlVariable v){
-        if(v instanceof YamlBytes){
-            put((YamlBytes) v);
-        }else if(v instanceof YamlNumber){
-            put((YamlNumber) v);
-        }else if(v instanceof YamlArray){
-            put((YamlArray) v);
-        }else if(v instanceof YamlObject){
-            put((YamlObject) v);
+
+    private void put(YamlObject m){
+        int d = 0;
+        for(YamlBytes k : m.keySet()){
+            putKey(k);
+            putVariable(m.valueOf(k), d);
         }
     }
 
-    private void put(YamlBytes v){
+    private void putVariable(YamlVariable v, int d){
+        if(v instanceof YamlBytes){
+            putVariable((YamlBytes) v);
+        }else if(v instanceof YamlNumber){
+            putVariable((YamlNumber) v);
+        }else if(v instanceof YamlArray){
+            putVariable((YamlArray) v, d+2);
+        }else if(v instanceof YamlObject){
+            putVariable((YamlObject) v, d+2);
+        }
     }
 
-    private void put(YamlNumber n){
+    private void putKey(YamlBytes v){
+        byte[] b = v.getBytes();
+        System.arraycopy(b, 0, buf, pos, b.length);
+        pos += b.length;
+        buf[pos] = ':';
+        buf[pos+1] = 0x20;
+        pos += 2;
     }
 
-    private void put(YamlArray l){
+    private void putVariable(YamlBytes v){
+        byte[] b = v.getBytes();
+        System.arraycopy(b, 0, buf, pos, b.length);
+        pos += b.length;
+        buf[pos] = '\r';
+        buf[pos+1] = '\n';
+        pos += 2;
     }
 
-    private void put(YamlObject m){
+    private void putVariable(YamlNumber v){
+        byte[] b = v.getBytes();
+        System.arraycopy(b, 0, buf, pos, b.length);
+        pos += b.length;
+        buf[pos] = '\r';
+        buf[pos+1] = '\n';
+        pos += 2;
+    }
+
+    private void putVariable(YamlArray l, int d){
+        buf[pos] = '\r';
+        buf[pos+1] = '\n';
+        pos += 2;
+        for(int i = 0; i < l.size(); i++){
+            for(int j = 0; j < d; j++){
+                buf[pos] = 0x20;
+                pos++;
+            }
+
+            buf[pos] = '-';
+            buf[pos+1] = ' ';
+            pos += 2;
+
+            putVariable(l.valueOf(i), d);
+        }
+    }
+
+    private void putVariable(YamlObject m, int d){
+        buf[pos] = '\r';
+        buf[pos+1] = '\n';
+        pos += 2;
+        for(YamlBytes k : m.keySet()){
+            for(int i = 0; i < d; i++){
+                buf[pos] = 0x20;
+                pos++;
+            }
+
+            putKey(k);
+            putVariable(m.valueOf(k), d);
+        }
     }
 
     private List<YamlVariable> decodeArray()throws YamlException {
@@ -76,10 +154,12 @@ public class Yamler {
     private Map<YamlBytes, YamlVariable> decodeObject(int d)throws YamlException {
         HashMap<YamlBytes, YamlVariable> m = new HashMap<>();
         while(pos < buf.length && !isNewLine()){
+
             int de = getDepth();
             if(de < d){
                 pos--;
                 break;
+
             }else if(d != de){
                 throw new YamlException("Depth is incorrect... "+d+"  "+de);
             }

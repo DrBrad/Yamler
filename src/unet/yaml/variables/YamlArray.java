@@ -1,8 +1,5 @@
 package unet.yaml.variables;
 
-import unet.yaml.YamlException;
-import unet.yaml.Yamler;
-
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -10,11 +7,14 @@ import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 
-public class YamlArray implements YamlVariable {
+public class YamlArray implements YamlVariable, YamlObserver {
 
     private ArrayList<YamlVariable> l = new ArrayList<>();
+    private YamlObserver o;
+    private int s, d;
 
     public YamlArray(){
+        d = 0;
     }
 
     public YamlArray(List<?> l){
@@ -37,6 +37,7 @@ public class YamlArray implements YamlVariable {
 
     private void add(YamlVariable v){
         l.add(v);
+        setByteSize(v.byteSize()+4+d);
     }
 
     public void add(Number n){
@@ -68,7 +69,15 @@ public class YamlArray implements YamlVariable {
     }
 
     private void set(int i, YamlVariable v){
-        l.set(i, v);
+        if(l.size() >= i){
+            int n = -l.get(i).byteSize()-4-d;
+            l.set(i, v);
+            setByteSize((v.byteSize()+4+d)+n);
+
+        }else{
+            l.set(i, v);
+            setByteSize(v.byteSize()+4+d);
+        }
     }
 
     public void set(int i, Number n){
@@ -173,6 +182,7 @@ public class YamlArray implements YamlVariable {
 
     private void remove(YamlVariable v){
         if(l.contains(v)){
+            setByteSize(-v.byteSize()-4-d);
             l.remove(v);
         }
     }
@@ -212,6 +222,35 @@ public class YamlArray implements YamlVariable {
         return l.size();
     }
 
+    protected void setDepth(int d){
+        this.d = d;
+        s += l.size()*d;
+
+        if(o != null){
+            o.update(s);
+        }
+    }
+
+    protected void setObserver(YamlObserver observer){
+        o = observer;
+    }
+
+    private void setByteSize(int s){
+        if(o != null){
+            o.update(s);
+        }
+        this.s += s;
+    }
+
+    @Override
+    public void update(int s){
+        this.s += s;
+
+        if(o != null){
+            o.update(s);
+        }
+    }
+
     @Override
     public Object getObject(){
         ArrayList<Object> a = new ArrayList<>();
@@ -219,6 +258,11 @@ public class YamlArray implements YamlVariable {
             a.add(v.getObject());
         }
         return a;
+    }
+
+    @Override
+    public int byteSize(){
+        return s;
     }
 
     @Override

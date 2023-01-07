@@ -26,6 +26,11 @@ public class YamlNumber implements YamlVariable {
     }
 
     @Override
+    public int byteSize(){
+        return getBytes().length;
+    }
+
+    @Override
     public boolean equals(Object o){
         if(o instanceof YamlNumber){
             return Arrays.equals(getBytes(), ((YamlNumber) o).getBytes());

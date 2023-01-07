@@ -7,11 +7,14 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 
-public class YamlObject implements YamlVariable {
+public class YamlObject implements YamlVariable, YamlObserver {
 
     private HashMap<YamlBytes, YamlVariable> m = new HashMap<>();
+    private YamlObserver o;
+    private int s, d;
 
     public YamlObject(){
+        d = 0;
     }
 
     public YamlObject(Map<?, ?> m){
@@ -52,6 +55,7 @@ public class YamlObject implements YamlVariable {
 
     private void put(YamlBytes k, YamlVariable v){
         m.put(k, v);
+        setByteSize(k.byteSize()+v.byteSize()+4+d);
     }
 
     private void put(YamlBytes k, Number n){
@@ -70,8 +74,8 @@ public class YamlObject implements YamlVariable {
         put(k, new YamlArray(l));
     }
 
-    private void put(YamlBytes k, Map<?, ?> l){
-        put(k, new YamlObject(l));
+    private void put(YamlBytes k, Map<?, ?> m){
+        put(k, new YamlObject(m));
     }
 
     public void put(String k, Number n){
@@ -95,11 +99,15 @@ public class YamlObject implements YamlVariable {
     }
 
     public void put(String k, YamlArray a){
+        a.setDepth(d+2);
         put(new YamlBytes(k.getBytes()), a);
+        a.setObserver(this);
     }
 
     public void put(String k, YamlObject o){
+        o.setDepth(d+2);
         put(new YamlBytes(k.getBytes()), o);
+        o.setObserver(this);
     }
 
     public YamlVariable valueOf(YamlBytes k){
@@ -181,6 +189,7 @@ public class YamlObject implements YamlVariable {
     public void remove(String k){
         YamlBytes b = new YamlBytes(k.getBytes());
         if(m.containsKey(b)){
+            setByteSize(-b.byteSize()-m.get(b).byteSize()-4-d);
             m.remove(b);
         }
     }
@@ -197,6 +206,35 @@ public class YamlObject implements YamlVariable {
         return m.size();
     }
 
+    protected void setDepth(int d){
+        this.d = d;
+        s += m.size()*d;
+
+        if(o != null){
+            o.update(s);
+        }
+    }
+
+    protected void setObserver(YamlObserver observer){
+        o = observer;
+    }
+
+    private void setByteSize(int s){
+        if(o != null){
+            o.update(s);
+        }
+        this.s += s;
+    }
+
+    @Override
+    public void update(int s){
+        this.s += s;
+
+        if(o != null){
+            o.update(s);
+        }
+    }
+
     @Override
     public Map<String, ?> getObject(){
         HashMap<String, Object> h = new HashMap<>();
@@ -204,6 +242,11 @@ public class YamlObject implements YamlVariable {
             h.put(new String(k.getObject()), m.get(k).getObject());
         }
         return h;
+    }
+
+    @Override
+    public int byteSize(){
+        return s;
     }
 
     @Override
