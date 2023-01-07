@@ -30,7 +30,7 @@ Byte Size when encoded
 
 Library
 -----
-The JAR for the library can be found here: [YAML JAR](https://github.com/DrBrad/Yamler/blob/main/out/artifacts/Yaml_jar/Yaml.jar?raw=true)
+The JAR for the library can be found here: [YAML JAR](https://github.com/DrBrad/Yamler/blob/main/out/artifacts/Yamler_jar/Yamler.jar?raw=true)
 
 Usage
 -----
