@@ -1,0 +1,8 @@
+<component name="ArtifactManager">
+  <artifact type="jar" name="Yaml:jar">
+    <output-path>$PROJECT_DIR$/out/artifacts/Yaml_jar</output-path>
+    <root id="archive" name="Yaml.jar">
+      <element id="module-output" name="Yaml" />
+    </root>
+  </artifact>
+</component>
