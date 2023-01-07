@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/Yaml.iml" filepath="$PROJECT_DIR$/Yaml.iml" />
+      <module fileurl="file://$PROJECT_DIR$/Yamler.iml" filepath="$PROJECT_DIR$/Yamler.iml" />
     </modules>
   </component>
 </project>
