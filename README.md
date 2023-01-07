@@ -63,7 +63,7 @@ yob.get("KEY");
 
 **Encoding to byte array**
 ```Java
-yar.encode();
+yob.encode();
 ```
 
 **Readable String**
