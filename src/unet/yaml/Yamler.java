@@ -199,24 +199,13 @@ public class Yamler {
                 pos++;
             }
 
-            if(buf[pos] == 0x27){
+            byte q = buf[pos];
+
+            if(q == 0x27 || q == '"'){
                 pos++;
 
                 int s = pos;
-                while(pos < buf.length && buf[pos] != 0x27){
-                    pos++;
-                }
-
-                byte[] b = new byte[pos-s];
-                System.arraycopy(buf, s, b, 0, pos-s);
-                a.add(new YamlBytes(b));
-                pos++;
-
-            }else if(buf[pos] == '"'){
-                pos++;
-
-                int s = pos;
-                while(pos < buf.length && buf[pos] != '"'){
+                while(pos < buf.length && buf[pos] != q){
                     pos++;
                 }
 
@@ -270,7 +259,6 @@ public class Yamler {
                 pos++;
             }
 
-
             int s = pos;
             while(pos < buf.length && (buf[pos] != ':' && !isSpace())){
                 if(buf[pos] == '}' || isNewLine()){
@@ -285,15 +273,11 @@ public class Yamler {
                 System.arraycopy(buf, s+1, k, 0, pos-s-2);
                 pos++;
 
-                //return new YamlBytes(b);
             }else{
                 k = new byte[pos-s];
                 System.arraycopy(buf, s, k, 0, pos-s);
                 pos++;
             }
-
-
-
 
             if(isSpace() || isNewLine()){
                 while(pos < buf.length && (isSpace() || isNewLine())){
@@ -305,22 +289,34 @@ public class Yamler {
                 break;
             }
 
+            byte q = buf[pos];
 
-            //VARIABLE TIME...
-
-
-            //IF ' | "  ???
-            s = pos;
-            while(pos < buf.length && (buf[pos] != ',' && !isSpace())){
-                if(buf[pos] == '}' || isNewLine()){
-                    break;
-                }
+            if(q == 0x27 || q == '"'){
                 pos++;
-            }
 
-            byte[] v = new byte[pos-s];
-            System.arraycopy(buf, s, v, 0, pos-s);
-            m.put(new YamlBytes(k), new YamlBytes(v));              //IF NULL STILL ADD KEY AS NULL.... IF POSSIBLE...?
+                s = pos;
+                while(pos < buf.length && buf[pos] != q){
+                    pos++;
+                }
+
+                byte[] v = new byte[pos-s];
+                System.arraycopy(buf, s, v, 0, pos-s);
+                m.put(new YamlBytes(k), new YamlBytes(v));              //IF NULL STILL ADD KEY AS NULL.... IF POSSIBLE...?
+                pos++;
+
+            }else{
+                s = pos;
+                while(pos < buf.length && (buf[pos] != ',' && !isSpace())){
+                    if(buf[pos] == '}' || isNewLine()){
+                        break;
+                    }
+                    pos++;
+                }
+
+                byte[] v = new byte[pos-s];
+                System.arraycopy(buf, s, v, 0, pos-s);
+                m.put(new YamlBytes(k), new YamlBytes(v));              //IF NULL STILL ADD KEY AS NULL.... IF POSSIBLE...?
+            }
 
             if(isSpace() || isNewLine()){
                 while(pos < buf.length && isSpace()){
@@ -342,9 +338,6 @@ public class Yamler {
             }
             pos++;
         }
-
-        System.out.println("OBJECT");
-
 
         return m;
     }
