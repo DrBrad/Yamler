@@ -75,8 +75,12 @@ public class Yamler {
     private Map<YamlBytes, YamlVariable> decodeObject(int d)throws YamlException {
         HashMap<YamlBytes, YamlVariable> m = new HashMap<>();
         while(pos < buf.length && !isNewLine()){
-            if(d != getDepth()){
-                throw new YamlException("Depth is incorrect... "+d);
+            int de = getDepth();
+            if(de < d){
+                pos--;
+                break;
+            }else if(d != de){
+                throw new YamlException("Depth is incorrect... "+d+"  "+de);
             }
 
             if(isNewLine()){
@@ -151,7 +155,7 @@ public class Yamler {
 
         if(isList()){
             pos++;
-            return getList();
+            return new YamlArray(getList());
         }
 
         if(isMultiLine()){
@@ -203,50 +207,64 @@ public class Yamler {
         return new YamlBytes(new byte[0]);
     }
 
-    private YamlVariable getList(){
+    private List<YamlVariable> getList(){
+        ArrayList<YamlVariable> a = new ArrayList<>();
         while(pos < buf.length && buf[pos] != ']'){
-            while(pos < buf.length && isSpace()){
+            while(pos < buf.length && (isSpace() || isNewLine() || buf[pos] == ',')){
                 pos++;
             }
 
+
             if(buf[pos] == 0x27){
-                //NL IS POSSIBLE...
+                pos++;
+
                 int s = pos;
                 while(pos < buf.length && buf[pos] != 0x27){
-                    if(buf[pos] == ']'){
-                        pos--;
+                    pos++;
+                }
+
+                byte[] b = new byte[pos-s];
+                System.arraycopy(buf, s, b, 0, pos-s);
+                a.add(new YamlBytes(b));
+                pos++;
+
+            }else if(buf[pos] == '"'){
+                pos++;
+
+                int s = pos;
+                while(pos < buf.length && buf[pos] != '"'){
+                    pos++;
+                }
+
+                byte[] b = new byte[pos-s];
+                System.arraycopy(buf, s, b, 0, pos-s);
+                a.add(new YamlBytes(b));
+                pos++;
+
+            }else{
+                int s = pos;
+                while(pos < buf.length && (buf[pos] != ',' && !isSpace())){
+                    if(buf[pos] == ']' || isNewLine()){
                         break;
                     }
                     pos++;
                 }
-                //System.out.println(new String(buf, s, pos-s));
-                pos++;
-                continue;
+
+                byte[] b = new byte[pos-s];
+                System.arraycopy(buf, s, b, 0, pos-s);
+                a.add(new YamlBytes(b));
             }
 
-            int s = pos;
-            while(pos < buf.length && buf[pos] != ','){
-                if(buf[pos] == ']'){
-                    pos--;
-                    break;
+            if(isSpace() || isNewLine()){
+                while(pos < buf.length && isSpace()){
+                    pos++;
                 }
-                pos++;
             }
 
-            //System.out.println("Q  "+q);
+            if(buf[pos] == ']'){
+                break;
+            }
 
-            //if((q == 1 && buf[pos-1] == 0x27) || (q == 2 && buf[pos-1] == '"')){
-            //    System.out.println(new String(buf, s+1, pos-s-2));
-
-            //}else{
-                //System.out.println(new String(buf, s, pos-s));
-            //}
-
-
-            /*
-            while(pos < buf.length && isSpace()){
-                pos++;
-            }*/
             pos++;
         }
         pos++;
@@ -258,7 +276,7 @@ public class Yamler {
             pos++;
         }
 
-        return new YamlBytes("".getBytes());
+        return a;
     }
 
     private YamlBytes getQuote(int q){
